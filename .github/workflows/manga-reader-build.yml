@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-android:
@@ -35,3 +35,15 @@ jobs:
           path: app/build/outputs/apk/foss/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish universal APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.20.4-manga-reader.1
+          name: Manga Reader v0.20.4-manga-reader.1
+          body: |
+            Native Android build based on the Mihon Apache-2.0 codebase.
+
+            Download `app-universal-foss.apk` for a device-independent install package. The app contains no content; add only extension repositories and sources you are permitted to use.
+          files: app/build/outputs/apk/foss/app-universal-foss.apk
+          fail_on_unmatched_files: true
