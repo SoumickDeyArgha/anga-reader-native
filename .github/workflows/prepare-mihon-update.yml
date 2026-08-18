@@ -1,0 +1,78 @@
+name: Prepare Mihon Update for Approval
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare-update:
+    name: Detect and prepare a new Mihon release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out Manga Reader
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Mihon's latest stable release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LATEST=$(gh api repos/mihonapp/mihon/releases/latest --jq .tag_name)
+          CURRENT=$(cat .github/manga-reader-upstream.txt)
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          if [ "$LATEST" = "$CURRENT" ]; then
+            echo "update_available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "update_available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop when the fork is already current
+        if: steps.upstream.outputs.update_available != 'true'
+        run: echo "Manga Reader already tracks Mihon ${{ steps.upstream.outputs.current }}."
+
+      - name: Stop when an approval pull request already exists
+        id: existing
+        if: steps.upstream.outputs.update_available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="upstream/mihon-${{ steps.upstream.outputs.latest }}"
+          COUNT=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')
+          echo "exists=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Merge the upstream release into an approval branch
+        if: steps.upstream.outputs.update_available == 'true' && steps.existing.outputs.exists == '0'
+        env:
+          LATEST: ${{ steps.upstream.outputs.latest }}
+        run: |
+          BRANCH="upstream/mihon-$LATEST"
+          git config user.name "Manga Reader Update Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add mihon-upstream https://github.com/mihonapp/mihon.git 2>/dev/null || git remote set-url mihon-upstream https://github.com/mihonapp/mihon.git
+          git fetch mihon-upstream "refs/tags/$LATEST:refs/tags/$LATEST"
+          git checkout -B "$BRANCH"
+          git merge --no-edit "refs/tags/$LATEST"
+          printf '%s\n' "$LATEST" > .github/manga-reader-upstream.txt
+          git add .github/manga-reader-upstream.txt
+          git commit -m "chore: prepare Mihon $LATEST for approval"
+          git push --force-with-lease origin "$BRANCH"
+
+      - name: Open the approval pull request
+        if: steps.upstream.outputs.update_available == 'true' && steps.existing.outputs.exists == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.upstream.outputs.latest }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "upstream/mihon-$LATEST" \
+            --title "Prepare Mihon $LATEST for Manga Reader" \
+            --body "A scheduled check detected Mihon $LATEST. This pull request merges the upstream release while preserving Manga Reader's fork-specific changes. Review the Files changed tab, then merge it to trigger the APK build and GitHub release."

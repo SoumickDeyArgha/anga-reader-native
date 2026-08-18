@@ -25,6 +25,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Determine Manga Reader release tag
+        id: release
+        run: |
+          VERSION=$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"/\1/p' app/build.gradle.kts)
+          test -n "$VERSION"
+          echo "tag=v${VERSION}-manga-reader.1" >> "$GITHUB_OUTPUT"
+          echo "name=Manga Reader v${VERSION}-manga-reader.1" >> "$GITHUB_OUTPUT"
+
       - name: Build the FOSS APK
         run: ./gradlew assembleFoss
 
@@ -39,11 +47,12 @@ jobs:
       - name: Publish universal APK to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.20.4-manga-reader.1
-          name: Manga Reader v0.20.4-manga-reader.1
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.name }}
           body: |
             Native Android build based on the Mihon Apache-2.0 codebase.
 
             Download `app-universal-foss.apk` for a device-independent install package. The app contains no content; add only extension repositories and sources you are permitted to use.
           files: app/build/outputs/apk/foss/app-universal-foss.apk
           fail_on_unmatched_files: true
+          overwrite_files: true
