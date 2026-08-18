@@ -1,9 +1,8 @@
 name: Build Manga Reader APK
 
 on:
+  workflow_call:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 permissions:
   contents: write

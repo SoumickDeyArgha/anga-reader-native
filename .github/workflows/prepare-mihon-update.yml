@@ -1,4 +1,4 @@
-name: Prepare Mihon Update for Approval
+name: Sync Mihon Release and Publish
 
 on:
   schedule:
@@ -7,12 +7,13 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
-  prepare-update:
-    name: Detect and prepare a new Mihon release
+  sync-release:
+    name: Detect and sync a new Mihon release
     runs-on: ubuntu-24.04
+    outputs:
+      update_available: ${{ steps.upstream.outputs.update_available }}
     steps:
       - name: Check out Manga Reader
         uses: actions/checkout@v4
@@ -38,41 +39,25 @@ jobs:
         if: steps.upstream.outputs.update_available != 'true'
         run: echo "Manga Reader already tracks Mihon ${{ steps.upstream.outputs.current }}."
 
-      - name: Stop when an approval pull request already exists
-        id: existing
+      - name: Merge the upstream release into main
         if: steps.upstream.outputs.update_available == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          BRANCH="upstream/mihon-${{ steps.upstream.outputs.latest }}"
-          COUNT=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')
-          echo "exists=$COUNT" >> "$GITHUB_OUTPUT"
-
-      - name: Merge the upstream release into an approval branch
-        if: steps.upstream.outputs.update_available == 'true' && steps.existing.outputs.exists == '0'
         env:
           LATEST: ${{ steps.upstream.outputs.latest }}
         run: |
-          BRANCH="upstream/mihon-$LATEST"
           git config user.name "Manga Reader Update Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add mihon-upstream https://github.com/mihonapp/mihon.git 2>/dev/null || git remote set-url mihon-upstream https://github.com/mihonapp/mihon.git
           git fetch mihon-upstream "refs/tags/$LATEST:refs/tags/$LATEST"
-          git checkout -B "$BRANCH"
           git merge --no-edit "refs/tags/$LATEST"
           printf '%s\n' "$LATEST" > .github/manga-reader-upstream.txt
           git add .github/manga-reader-upstream.txt
-          git commit -m "chore: prepare Mihon $LATEST for approval"
-          git push --force-with-lease origin "$BRANCH"
+          git commit -m "chore: sync Mihon $LATEST"
+          git push origin HEAD:main
 
-      - name: Open the approval pull request
-        if: steps.upstream.outputs.update_available == 'true' && steps.existing.outputs.exists == '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          LATEST: ${{ steps.upstream.outputs.latest }}
-        run: |
-          gh pr create \
-            --base main \
-            --head "upstream/mihon-$LATEST" \
-            --title "Prepare Mihon $LATEST for Manga Reader" \
-            --body "A scheduled check detected Mihon $LATEST. This pull request merges the upstream release while preserving Manga Reader's fork-specific changes. Review the Files changed tab, then merge it to trigger the APK build and GitHub release."
+  build-and-release:
+    name: Build and publish Manga Reader
+    needs: sync-release
+    if: needs.sync-release.outputs.update_available == 'true'
+    uses: ./.github/workflows/manga-reader-build.yml
+    permissions:
+      contents: write

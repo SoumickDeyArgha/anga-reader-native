@@ -16,11 +16,11 @@ Only install extensions and access sources in accordance with their terms, appli
 
 GitHub Actions builds an Android APK without requiring Android Studio or the Android SDK on your computer. In the repository, open **Actions → Build Manga Reader APK → Run workflow** and download the generated APK from the completed workflow artifacts.
 
-## Approved upstream updates
+## Automatic upstream updates
 
-Every six hours, the **Prepare Mihon Update for Approval** workflow checks Mihon's latest stable release. When a newer version is available, it opens a pull request named **Prepare Mihon `<version>` for Manga Reader**. Review the pull request and merge it when you are ready; merging to `main` triggers the Android build and publishes the universal APK as a GitHub release.
+Every six hours, the **Sync Mihon Release and Publish** workflow checks Mihon's latest stable release. When a newer release is available, it merges that release into `main`, builds the FOSS Android APK, and publishes the universal APK as a GitHub release without manual intervention.
 
-If the upstream merge has conflicts, the workflow stops without publishing anything. Resolve the conflicts in the pull request before merging so Manga Reader's fork-specific identity and configuration remain intact.
+If the upstream merge has conflicts, the workflow stops without publishing anything. Resolve the conflict on `main` before the next scheduled run so Manga Reader's fork-specific identity and configuration remain intact.
 
 ## Attribution and license
 
