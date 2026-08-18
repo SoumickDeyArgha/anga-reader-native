@@ -28,7 +28,7 @@ dependencyResolutionManagement {
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-rootProject.name = "Manga Reader"
+rootProject.name = "MangaReader"
 include(":app")
 include(":baseline-profile")
 include(":core-metadata")
