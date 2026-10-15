@@ -12,6 +12,7 @@ interface BuildConfig {
 val Project.Config: BuildConfig get() = object : BuildConfig {
     // Independent fork: do not send data to upstream Mihon services.
     override val includeTelemetry: Boolean = false
+    override val uploadCrashlyticsMapping: Boolean = false
 
     // Independent fork: do not use Mihon's upstream update endpoint.
     override val enableUpdater: Boolean = false
